@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FraudWatch - Obsidian Sentinel</title>
+    <!-- We import fonts in style.css, but this ensures fast loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <i class='bx bx-shield-quarter'></i>
+            <span>FraudWatch</span>
+        </div>
+        <ul class="nav-links">
+            <li class="active" data-view="dashboard">
+                <i class='bx bx-chart'></i>
+                <span class="links_name">Dashboard</span>
+            </li>
+            <li data-view="simulate">
+                <i class='bx bx-transfer'></i>
+                <span class="links_name">Simulation Hub</span>
+            </li>
+            <li data-view="alerts">
+                <i class='bx bx-radar'></i>
+                <span class="links_name">Threat Alerts</span>
+            </li>
+            <li data-view="blacklist">
+                <i class='bx bx-block'></i>
+                <span class="links_name">Blocklist Config</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content Area -->
+    <section class="home-section">
+        <nav class="top-navbar">
+            <div class="dashboard-title" id="page-title">Dashboard</div>
+            <div class="profile-chip">
+                <i class='bx bxs-user-circle' style="font-size: 24px; color: var(--primary);"></i>
+                <span>Admin User</span>
+                <span class="role">Sec-Ops</span>
+            </div>
+        </nav>
+
+        <div class="home-content">
+            
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="view-section active-view">
+                <div class="overview-boxes">
+                    <div class="box slide-in stagger-1">
+                        <div class="right-side">
+                            <div class="box-topic">Total Volume</div>
+                            <div class="number" id="dash-total-txns">0</div>
+                        </div>
+                        <div class="icon-wrapper"><i class='bx bx-data'></i></div>
+                    </div>
+                    <div class="box slide-in stagger-2">
+                        <div class="right-side">
+                            <div class="box-topic">Active Threats</div>
+                            <div class="number" id="dash-open-alerts">0</div>
+                        </div>
+                        <div class="icon-wrapper"><i class='bx bx-error'></i></div>
+                    </div>
+                    <div class="box slide-in stagger-3">
+                        <div class="right-side">
+                            <div class="box-topic">Quarantined Accs</div>
+                            <div class="number" id="dash-blocked-accs">0</div>
+                        </div>
+                        <div class="icon-wrapper"><i class='bx bx-user-x'></i></div>
+                    </div>
+                    <div class="box slide-in stagger-4">
+                        <div class="right-side">
+                            <div class="box-topic">Suspicious Vectors</div>
+                            <div class="number" id="dash-flagged-txns">0</div>
+                        </div>
+                        <div class="icon-wrapper"><i class='bx bx-crosshair'></i></div>
+                    </div>
+                </div>
+
+                <!-- Dual Graphs -->
+                <div class="tables-container slide-in stagger-2" style="margin-bottom: 30px;">
+                    <!-- Telemetry Graph -->
+                    <div class="box" style="flex: 2; position: relative; height: 320px;">
+                        <div class="title" style="margin-bottom: 10px;">Volume Telemetry Overlay</div>
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                    
+                    <!-- Status Distribution Graph -->
+                    <div class="box" style="flex: 1; position: relative; height: 320px; display: flex; flex-direction: column; align-items: center;">
+                        <div class="title" style="margin-bottom: 5px; align-self: flex-start;">Global Action Distribution</div>
+                        <div style="flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tables-container slide-in stagger-3">
+                    <div class="recent-sales box">
+                        <div class="title">Live Transaction Feed</div>
+                        <div class="table-responsive">
+                            <table id="recent-txns-table">
+                                <thead>
+                                    <tr>
+                                        <th>Route ID</th>
+                                        <th>Entity</th>
+                                        <th>Volume</th>
+                                        <th>Protocol</th>
+                                        <th>Timestamp</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="top-sales box">
+                        <div class="title">Critical Anomalies</div>
+                        <ul class="top-sales-details" id="active-alerts-list">
+                            <!-- Populated via JS -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Simulate Transaction View -->
+            <div id="simulate-view" class="view-section">
+                <div class="box full-width flex-row">
+                    <div class="form-container">
+                        <div class="title">Inject Simulation Vector</div>
+                        <form id="simulate-form">
+                            <div class="input-group">
+                                <label>Target Entity</label>
+                                <select id="sim-account" required></select>
+                            </div>
+                            <div class="inline-form">
+                                <div class="input-group">
+                                    <label>Volume (₹)</label>
+                                    <input type="number" id="sim-amount" required>
+                                </div>
+                                <div class="input-group">
+                                    <label>Protocol</label>
+                                    <select id="sim-type">
+                                        <option value="DEBIT">Debit</option>
+                                        <option value="CREDIT">Credit</option>
+                                        <option value="TRANSFER">Transfer</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="inline-form">
+                                <div class="input-group">
+                                    <label>Origin IP</label>
+                                    <input type="text" id="sim-ip">
+                                </div>
+                                <div class="input-group">
+                                    <label>Geofence</label>
+                                    <input type="text" id="sim-location" placeholder="e.g., Mumbai, India">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn"><i class='bx bx-rocket'></i> Execute Transfer</button>
+                        </form>
+                    </div>
+                    
+                    <div class="result-container" id="sim-result-container" style="display:none;">
+                        <div class="title">Engine Telemetry</div>
+                        <div class="result-card" id="sim-result-card">
+                            <div class="result-header">
+                                <h3 style="font-family: 'Plus Jakarta Sans';">Clearance: <span id="res-status" class="status-badge" style="margin-left: 10px;"></span></h3>
+                                <div style="text-align: right;">
+                                    <span style="font-size: 12px; color: var(--on-surface-variant); text-transform: uppercase;">Risk Matrix</span><br>
+                                    <strong id="res-score" style="font-size: 24px; color: #fff;"></strong>
+                                </div>
+                            </div>
+                            <div class="risk-meter-container" style="margin-bottom: 20px;">
+                                <div class="risk-meter-bg" style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; position: relative; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);">
+                                    <div id="res-risk-fill" class="risk-meter-fill" style="width: 0%; height: 100%; border-radius: 4px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1), background-color 1s ease;"></div>
+                                </div>
+                            </div>
+                            <div class="result-body">
+                                <h4>Triggered Directives:</h4>
+                                <ul id="res-rules"></ul>
+                                <p id="res-alert-id" style="display:none; color: var(--danger); font-family: monospace; margin-top: 15px; font-size: 15px; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px;"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraud Alerts View -->
+            <div id="alerts-view" class="view-section">
+                <div class="tables-container" style="margin-bottom: 30px;">
+                    <div class="box full-width" style="position: relative; height: 260px;">
+                        <div class="title">Threat Vector Frequency (Rule Hits)</div>
+                        <canvas id="rulesChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="box full-width">
+                    <div class="title">Threat Resolution Feed</div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="alerts-table">
+                            <thead>
+                                <tr>
+                                    <th>Incident ID</th>
+                                    <th>Target Entity</th>
+                                    <th>Exposed Vol</th>
+                                    <th>Risk Score</th>
+                                    <th>Violated Directives</th>
+                                    <th>Origin Vector</th>
+                                    <th>State</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blacklist Manager View -->
+            <div id="blacklist-view" class="view-section">
+                <div class="box full-width">
+                    <div class="title">Global Blocklist Configuration</div>
+                    
+                    <form id="blacklist-form" class="inline-form" style="margin-bottom: 30px;">
+                        <div class="input-group" style="flex: 1; margin:0;"><input type="text" id="bl-value" placeholder="IP Address or Geolocation" required></div>
+                        <div class="input-group" style="flex: 2; margin:0;"><input type="text" id="bl-reason" placeholder="Threat Rationale" required></div>
+                        <button type="submit" class="btn"><i class='bx bx-plus'></i> Enforce Block</button>
+                    </form>
+
+                    <div class="table-responsive mt-2">
+                        <table class="data-table" id="blacklist-table">
+                            <thead>
+                                <tr>
+                                    <th>Policy ID</th>
+                                    <th>Blocked Vector</th>
+                                    <th>Rationale</th>
+                                    <th>Enforcement Date</th>
+                                    <th>Modifications</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Populated via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Modal for Alert Resolution -->
+    <div id="resolveModal" class="modal">
+        <div class="modal-content">
+            <i class='bx bx-x close'></i>
+            <h2>Assess Incident</h2>
+            <p style="color: var(--on-surface-variant); margin-bottom: 20px;">Incident ID: <span id="modal-alert-id" style="color:var(--on-surface); font-family:monospace;"></span></p>
+            
+            <div style="background: var(--surface-container-low); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                    <input type="checkbox" id="modal-blacklist-ip" style="width: 20px; height: 20px;"> 
+                    <span style="font-weight:500;">Add origin vector (IP/Location) to Global Blocklist</span>
+                </label>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-success" style="flex:1;" onclick="resolveAlertConfirm('false_positive')"><i class='bx bx-check-shield'></i> Clear Entity</button>
+                <button class="btn btn-danger" style="flex:1;" onclick="resolveAlertConfirm('confirm_fraud')"><i class='bx bx-shield-x'></i> Confirm Fraud</button>
+            </div>
+            
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
