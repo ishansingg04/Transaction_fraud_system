@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
 import sqlite3
 import uuid
 from datetime import datetime
 from fraud_engine import run_fraud_checks
 
 app = Flask(__name__)
+CORS(app)
 DB_NAME = 'fraud_detection.db'
 
 # TODO: replace with MySQL connection when deploying
