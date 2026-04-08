@@ -1,74 +1,57 @@
-import sqlite3
-import os
-
-DB_NAME = 'fraud_detection.db'
-
-def create_connection():
-    """Create a database connection to the SQLite database specified by db_name"""
-    conn = None
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        # Enable foreign key constraints
-        conn.execute("PRAGMA foreign_keys = 1")
-        return conn
-    except sqlite3.Error as e:
-        print(f"Error connecting to database: {e}")
-    return conn
+import mysql.connector
 
 def setup_database():
-    """Create tables and insert seed data if not exists."""
-    conn = create_connection()
-    if conn is None:
-        print("Cannot create the database connection.")
-        return
-
     try:
+        conn = mysql.connector.connect(
+            host='localhost',
+            user='root',
+            password='IshanSingh0404'
+        )
         cursor = conn.cursor()
-
-        # Create Tables
-        print("Creating tables...")
+        
+        cursor.execute("CREATE DATABASE IF NOT EXISTS fraud_detection")
+        cursor.execute("USE fraud_detection")
         
         # 1. account_details
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS account_details (
-                account_number TEXT PRIMARY KEY,
-                account_name TEXT,
-                user_id TEXT UNIQUE,
-                account_balance REAL,
-                risk_level TEXT CHECK(risk_level IN ('LOW','MEDIUM','HIGH')),
-                account_pwd TEXT
+                account_number VARCHAR(255) PRIMARY KEY,
+                account_name VARCHAR(255),
+                user_id VARCHAR(255) UNIQUE,
+                account_balance DOUBLE,
+                risk_level ENUM('LOW','MEDIUM','HIGH'),
+                account_pwd VARCHAR(255)
             )
         """)
 
         # 2. status
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS status (
-                status_code TEXT PRIMARY KEY,
-                status_name TEXT
+                status_code VARCHAR(255) PRIMARY KEY,
+                status_name VARCHAR(255)
             )
         """)
 
         # 3. location
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS location (
-                location_id TEXT PRIMARY KEY,
-                ip_address TEXT,
-                city_country TEXT,
-                is_known_proxy INTEGER
+                location_id VARCHAR(255) PRIMARY KEY,
+                ip_address VARCHAR(255),
+                city_country VARCHAR(255),
+                is_known_proxy TINYINT(1)
             )
         """)
 
         # 4. transaction
-        # Note: status_code and location_id can be added later as there might be transactions without locations initially, but schema specifies FK
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS "transaction" (
-                transaction_id TEXT PRIMARY KEY,
-                account_number TEXT,
-                amount REAL,
-                date_time TEXT,
-                transaction_type TEXT,
-                status_code TEXT,
-                location_id TEXT,
+            CREATE TABLE IF NOT EXISTS `transaction` (
+                transaction_id VARCHAR(255) PRIMARY KEY,
+                account_number VARCHAR(255),
+                amount DOUBLE,
+                date_time DATETIME,
+                transaction_type VARCHAR(255),
+                status_code VARCHAR(255),
+                location_id VARCHAR(255),
                 FOREIGN KEY (account_number) REFERENCES account_details(account_number),
                 FOREIGN KEY (status_code) REFERENCES status(status_code),
                 FOREIGN KEY (location_id) REFERENCES location(location_id)
@@ -78,13 +61,13 @@ def setup_database():
         # 5. fraud_alert
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS fraud_alert (
-                alert_id TEXT PRIMARY KEY,
-                transaction_id TEXT,
-                account_number TEXT,
-                risk_score INTEGER,
-                alert_status TEXT CHECK(alert_status IN ('OPEN','CLOSED')),
-                rules_fired TEXT,
-                FOREIGN KEY (transaction_id) REFERENCES "transaction"(transaction_id),
+                alert_id VARCHAR(255) PRIMARY KEY,
+                transaction_id VARCHAR(255),
+                account_number VARCHAR(255),
+                risk_score INT,
+                alert_status ENUM('OPEN','CLOSED'),
+                rules_fired VARCHAR(255),
+                FOREIGN KEY (transaction_id) REFERENCES `transaction`(transaction_id),
                 FOREIGN KEY (account_number) REFERENCES account_details(account_number)
             )
         """)
@@ -92,28 +75,22 @@ def setup_database():
         # 6. blacklist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS blacklist (
-                blacklist_id TEXT PRIMARY KEY,
-                blocked_value TEXT,
-                reason_code TEXT,
-                date_added TEXT
+                blacklist_id VARCHAR(255) PRIMARY KEY,
+                blocked_value VARCHAR(255),
+                reason_code VARCHAR(255),
+                date_added DATE
             )
         """)
-
-        print("Tables created successfully.")
-
-        # Seed Data
-        print("Inserting seed data...")
-
-        # Insert Status
+        
+        # Seeding
         status_data = [
             ('PENDING', 'Pending'),
             ('COMPLETED', 'Completed'),
             ('FLAGGED', 'Flagged'),
             ('BLOCKED', 'Blocked')
         ]
-        cursor.executemany("INSERT OR IGNORE INTO status (status_code, status_name) VALUES (?, ?)", status_data)
+        cursor.executemany("INSERT IGNORE INTO status (status_code, status_name) VALUES (%s, %s)", status_data)
 
-        # Insert Accounts
         account_data = [
             ('ACC001', 'Rahul Sharma', 'user_rs', 45000, 'LOW', 'pwd123'),
             ('ACC002', 'Priya Mehta', 'user_pm', 120000, 'HIGH', 'pwd123'),
@@ -121,11 +98,8 @@ def setup_database():
             ('ACC004', 'Sneha Patel', 'user_sp', 200000, 'LOW', 'pwd123'),
             ('ACC005', 'Rohit Verma', 'user_rv', 15000, 'HIGH', 'pwd123')
         ]
-        cursor.executemany("INSERT OR IGNORE INTO account_details (account_number, account_name, user_id, account_balance, risk_level, account_pwd) VALUES (?, ?, ?, ?, ?, ?)", account_data)
+        cursor.executemany("INSERT IGNORE INTO account_details (account_number, account_name, user_id, account_balance, risk_level, account_pwd) VALUES (%s, %s, %s, %s, %s, %s)", account_data)
 
-        # Insert Locations for initial transactions to satisfy FK
-        # Will dynamically create these for seed transactions
-        
         # We need a location mapping to insert locations first
         locations = {
             'TXN001': ('LOC001', '192.168.1.1', 'Mumbai, India', 0),
@@ -147,7 +121,7 @@ def setup_database():
         
         # Insert unique locations based on values
         unique_locs = {v[0]: v for v in locations.values()}
-        cursor.executemany("INSERT OR IGNORE INTO location (location_id, ip_address, city_country, is_known_proxy) VALUES (?, ?, ?, ?)", list(unique_locs.values()))
+        cursor.executemany("INSERT IGNORE INTO location (location_id, ip_address, city_country, is_known_proxy) VALUES (%s, %s, %s, %s)", list(unique_locs.values()))
 
 
         # Insert Transactions
@@ -168,7 +142,7 @@ def setup_database():
             ('TXN014', 'ACC001', 550, '2024-01-15 16:00:00', 'CREDIT', 'COMPLETED', locations['TXN014'][0]),
             ('TXN015', 'ACC003', 300, '2024-01-15 17:00:00', 'DEBIT', 'COMPLETED', locations['TXN015'][0])
         ]
-        cursor.executemany("INSERT OR IGNORE INTO \"transaction\" (transaction_id, account_number, amount, date_time, transaction_type, status_code, location_id) VALUES (?, ?, ?, ?, ?, ?, ?)", transaction_data)
+        cursor.executemany("INSERT IGNORE INTO `transaction` (transaction_id, account_number, amount, date_time, transaction_type, status_code, location_id) VALUES (%s, %s, %s, %s, %s, %s, %s)", transaction_data)
 
 
         # Insert Blacklist
@@ -178,7 +152,7 @@ def setup_database():
             ('BL003', '103.44.12.8', 'Suspicious proxy server', '2024-01-12'),
             ('BL004', 'Karachi, Pakistan', 'Multiple fraud reports', '2024-01-12')
         ]
-        cursor.executemany("INSERT OR IGNORE INTO blacklist (blacklist_id, blocked_value, reason_code, date_added) VALUES (?, ?, ?, ?)", blacklist_data)
+        cursor.executemany("INSERT IGNORE INTO blacklist (blacklist_id, blocked_value, reason_code, date_added) VALUES (%s, %s, %s, %s)", blacklist_data)
 
 
         # Insert Fraud Alerts
@@ -189,16 +163,16 @@ def setup_database():
             ('ALT004', 'TXN011', 'ACC005', 80, 'OPEN', 'Blacklisted Location, Rapid Transactions'),
             ('ALT005', 'TXN006', 'ACC002', 70, 'CLOSED', 'Rapid Transactions, Blacklisted Location')
         ]
-        cursor.executemany("INSERT OR IGNORE INTO fraud_alert (alert_id, transaction_id, account_number, risk_score, alert_status, rules_fired) VALUES (?, ?, ?, ?, ?, ?)", alert_data)
-
-
+        cursor.executemany("INSERT IGNORE INTO fraud_alert (alert_id, transaction_id, account_number, risk_score, alert_status, rules_fired) VALUES (%s, %s, %s, %s, %s, %s)", alert_data)
+        
         conn.commit()
-        print("Seed data inserted successfully.")
-
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
+        print("Database rules seeded successfully.")
+        
+    except mysql.connector.Error as e:
+        print(f"Error: {e}")
     finally:
-        if conn:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
             conn.close()
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-import sqlite3
+import mysql.connector
 import uuid
 from datetime import datetime, timedelta
 
@@ -11,8 +11,8 @@ def check_unusual_amount(conn, account_number, new_amount):
         cursor = conn.cursor()
         # Query last 10 transactions for this account (Completed ones usually make sense, but will check all)
         cursor.execute('''
-            SELECT amount FROM "transaction"
-            WHERE account_number = ?
+            SELECT amount FROM `transaction`
+            WHERE account_number = %s
             ORDER BY date_time DESC
             LIMIT 10
         ''', (account_number,))
@@ -28,7 +28,7 @@ def check_unusual_amount(conn, account_number, new_amount):
             return True, 40
             
         return False, 0
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Error in check_unusual_amount: {e}")
         return False, 0
 
@@ -45,17 +45,13 @@ def check_rapid_transactions(conn, account_number, current_time_str):
 
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT COUNT(*) FROM "transaction"
-            WHERE account_number = ? 
-            AND date_time >= ? 
-            AND date_time <= ?
+            SELECT COUNT(*) FROM `transaction`
+            WHERE account_number = %s 
+            AND date_time >= %s 
+            AND date_time <= %s
         ''', (account_number, five_mins_ago_str, current_time_str))
         
         count = cursor.fetchone()[0]
-        
-        # > 3 means 4 or more transactions including the new one (if not inserted yet, checking existing count > 2? User says "count > 3", since this runs after insert or before? 
-        # Instructions say "implement the 3 fraud rules as Python functions that run automatically after every new transaction is inserted".
-        # So the new transaction is already inserted. Thus count > 3 means there are 4+ total.
         
         if count > 3:
             return True, 30
@@ -74,7 +70,7 @@ def check_blacklisted_location(conn, ip_address, city_country):
         cursor = conn.cursor()
         cursor.execute('''
             SELECT COUNT(*) FROM blacklist
-            WHERE blocked_value = ? OR blocked_value = ?
+            WHERE blocked_value = %s OR blocked_value = %s
         ''', (ip_address, city_country))
         
         count = cursor.fetchone()[0]
@@ -83,7 +79,7 @@ def check_blacklisted_location(conn, ip_address, city_country):
             return True, 50
             
         return False, 0
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Error in check_blacklisted_location: {e}")
         return False, 0
 
@@ -125,9 +121,9 @@ def run_fraud_checks(conn, transaction_id, account_number, amount, date_time, ip
         
         # Update transaction status
         cursor.execute('''
-            UPDATE "transaction"
-            SET status_code = ?
-            WHERE transaction_id = ?
+            UPDATE `transaction`
+            SET status_code = %s
+            WHERE transaction_id = %s
         ''', (final_status, transaction_id))
         
         # Update account risk level if blocked
@@ -135,7 +131,7 @@ def run_fraud_checks(conn, transaction_id, account_number, amount, date_time, ip
             cursor.execute('''
                 UPDATE account_details
                 SET risk_level = 'HIGH'
-                WHERE account_number = ?
+                WHERE account_number = %s
             ''', (account_number,))
             
         # Create alert if any rules fired
@@ -143,8 +139,8 @@ def run_fraud_checks(conn, transaction_id, account_number, amount, date_time, ip
         if rules_fired:
             alert_id = "ALT" + str(uuid.uuid4()).split('-')[0].upper()
             cursor.execute('''
-                INSERT INTO fraud_alert (alert_id, transaction_id, account_number, risk_score, alert_status, rules_fired)
-                VALUES (?, ?, ?, ?, 'OPEN', ?)
+                INSERT IGNORE INTO fraud_alert (alert_id, transaction_id, account_number, risk_score, alert_status, rules_fired)
+                VALUES (%s, %s, %s, %s, 'OPEN', %s)
             ''', (alert_id, transaction_id, account_number, total_score, ", ".join(rules_fired)))
             
         conn.commit()
@@ -156,7 +152,7 @@ def run_fraud_checks(conn, transaction_id, account_number, amount, date_time, ip
             "alert_id": alert_id
         }
         
-    except sqlite3.Error as e:
+    except mysql.connector.Error as e:
         print(f"Error updating DB with fraud check results: {e}")
         conn.rollback()
         return {
@@ -165,4 +161,3 @@ def run_fraud_checks(conn, transaction_id, account_number, amount, date_time, ip
             "final_status": "ERROR",
             "alert_id": None
         }
-
